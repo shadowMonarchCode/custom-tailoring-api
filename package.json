@@ -4,9 +4,9 @@
   "description": "",
   "main": "server.ts",
   "scripts": {
-    "start": "node server.ts",
+    "start": "node dist/server.ts",
     "dev": "nodemon server.ts",
-    "build": "npx tsc"
+    "build": "tsc"
   },
   "keywords": [],
   "author": "",
