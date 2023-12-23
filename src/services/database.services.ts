@@ -2,11 +2,10 @@ require("dotenv").config();
 import mongoose from "mongoose";
 
 export async function connectToDatabase() {
-  await mongoose.connect(process.env.DB_CONN_STRING!, {
-    dbName: "customTailoring"
+  const connection = `mongodb+srv://${process.env.DB_USER_NAME}:${process.env.DB_USER_PASSWORD}@cluster0.8ukzkuu.mongodb.net/?retryWrites=true&w=majority`;
+  await mongoose.connect(connection, {
+    dbName: "customTailoring",
   });
 
-  console.log(
-    `Database: ${mongoose.connection.name}`
-  );
+  console.log(`Database: ${mongoose.connection.name}`);
 }
