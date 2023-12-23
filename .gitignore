@@ -1,0 +1,8 @@
+# Folders
+/node_modules
+/test
+
+# Files
+.env
+.nodemonignore
+nodemon.json
