@@ -17,6 +17,10 @@ export const getCurrentUser = async (
     const user: IUser | null = await User.findById(userId).populate({
       path: "orders",
       select: "",
+      populate: {
+        path: "customerId",
+        select: "name phone",
+      },
     });
 
     if (!user) {
