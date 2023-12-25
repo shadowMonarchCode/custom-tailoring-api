@@ -5,7 +5,7 @@ export interface IUser extends Document {
   username: string;
   email: string;
   password: string;
-  shop: string[];
+  shops: string[];
   orders: string[];
   role: string;
 }
@@ -15,7 +15,7 @@ const userSchema = new Schema({
   username: { type: String, required: true, unique: true },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
-  shop: { type: [String], default: [] },
+  shops: { type: [String], default: [] },
   orders: { type: [mongoose.Schema.Types.ObjectId], ref: "Order", default: [] },
   role: { type: String, default: "User", enum: ["Admin", "Manager", "User"] },
 });

@@ -1,13 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { JwtPayload } from "jsonwebtoken";
+import { AuthenticatedRequest } from "../types";
 const jwt = require("jsonwebtoken");
-
-interface AuthenticatedRequest extends Request {
-  user?: {
-    userId: string;
-    role: string;
-  };
-}
 
 export const verifyToken = (
   req: AuthenticatedRequest,
@@ -34,6 +28,7 @@ export const verifyToken = (
         req.user = {
           userId: decoded.userId,
           role: decoded.role,
+          shops: decoded.shop,
         };
 
         next();

@@ -1,10 +1,10 @@
 import { Request, Response } from "express";
 import Customer, { ICustomer } from "../models/customer.model";
-import { UserRequest } from "../types";
+import { AuthenticatedRequest } from "../types";
 
 // Get customer detail
 export const getCustomerDetails = async (
-  req: UserRequest,
+  req: AuthenticatedRequest,
   res: Response
 ): Promise<void> => {
   try {
@@ -19,8 +19,9 @@ export const getCustomerDetails = async (
       customerId
     ).populate({
       path: "orders",
-      select: "orderNum orderDate status products shop",
+      select: "-measurements",
     });
+
     if (!customer) {
       res
         .status(404)
@@ -42,7 +43,7 @@ export const getAllCustomers = async (
   try {
     const customers: ICustomer[] | null = await Customer.find().populate({
       path: "orders",
-      select: "orderNum orderDate status products shop",
+      select: "-measurements",
     });
 
     if (!customers) {
@@ -76,6 +77,9 @@ export const getCustomerByPhoneOrName = async (
         { phone: { $regex: new RegExp(searchTerm, "i") } },
         { name: { $regex: new RegExp(searchTerm, "i") } },
       ],
+    }).populate({
+      path: "orders",
+      select: "-measurements",
     });
 
     if (customers.length === 0) {

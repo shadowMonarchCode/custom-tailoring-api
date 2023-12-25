@@ -13,7 +13,8 @@ export const authenticate = async (
   password: string,
   user_password: string,
   userId: string,
-  role: string
+  role: string,
+  shop: string[]
 ): Promise<string | null> => {
   try {
     // Compare the provided password with the hashed password stored in the database
@@ -22,7 +23,7 @@ export const authenticate = async (
     // If passwords match, generate and return a JWT token
     if (passwordMatch) {
       const token = jwt.sign(
-        { userId: userId, role: role },
+        { userId: userId, role: role, shop: shop },
         "superhumanisthekeytoextinction",
         { expiresIn: "1d" }
       );

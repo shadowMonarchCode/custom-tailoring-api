@@ -1,26 +1,24 @@
-import { Request, Response } from "express";
+import { Response } from "express";
 import Order, { IOrder } from "../models/order.model";
 import Customer, { ICustomer } from "../models/customer.model";
 import User, { IUser } from "../models/user.model";
 import mongoose from "mongoose";
-import { UserRequest } from "../types";
+import { AuthenticatedRequest } from "../types";
 
 // Get all orders
 export const getAllOrders = async (
-  req: UserRequest,
+  req: AuthenticatedRequest,
   res: Response
 ): Promise<void> => {
   try {
-    const { userId, role } = req.user!;
+    const { userId, role, shops } = req.user!;
 
     let orders: IOrder[] | null;
 
     if (role === "Manager" || role === "User") {
-      const manager: IUser | null = await User.findById(userId);
-      const shops = manager?.shop || [];
       orders = await Order.find({ shop: { $in: shops } }).populate([
         {
-          path: "customerId",
+          path: "customer",
           select: "name phone",
         },
         {
@@ -31,7 +29,7 @@ export const getAllOrders = async (
     } else if (role === "Admin") {
       orders = await Order.find().populate([
         {
-          path: "customerId",
+          path: "customer",
           select: "name phone",
         },
         {
@@ -52,12 +50,12 @@ export const getAllOrders = async (
 
 // Get order by order ID
 export const getOrderById = async (
-  req: UserRequest,
+  req: AuthenticatedRequest,
   res: Response
 ): Promise<void> => {
   try {
     const _id = req.params.orderId;
-    const { userId, role } = req.user!;
+    const { userId, role, shops } = req.user!;
 
     // Validate request parameter
     if (!_id) {
@@ -65,9 +63,9 @@ export const getOrderById = async (
       return;
     }
 
-    // Find order by custom ID
+    // Find order by ID
     const order: IOrder | null = await Order.findById(_id).populate({
-      path: "customerId",
+      path: "customer",
       select: "name phone",
     });
 
@@ -77,14 +75,11 @@ export const getOrderById = async (
     }
 
     // Check if shop matches them manager
-    if (role === "Manager") {
-      const manager: IUser | null = await User.findById(userId);
-      if (!manager?.shop.includes(order.shop)) {
-        res
-          .status(401)
-          .json({ error: "Unauthorized: You can't access this order." });
-        return;
-      }
+    if (role === "Manager" && shops.includes(order.shop)) {
+      res
+        .status(401)
+        .json({ error: "Unauthorized: You can't access this order." });
+      return;
     }
 
     res.json(order);
@@ -96,12 +91,12 @@ export const getOrderById = async (
 
 // All orders of a specific shop
 export const getOrdersByShop = async (
-  req: UserRequest,
+  req: AuthenticatedRequest,
   res: Response
 ): Promise<void> => {
   try {
     const shop = req.params.shop;
-    const { userId, role } = req.user!;
+    const { userId, role, shops } = req.user!;
 
     // Validate request parameter
     if (!shop) {
@@ -110,19 +105,17 @@ export const getOrdersByShop = async (
     }
 
     if (role === "Manager" || role === "User") {
-      const manager = await User.findById(userId);
-      const shops = manager?.shop || [];
-
       if (!shops.includes(shop)) {
         res.status(401).json({
           error: "Unauthorized: You can not view this shop's orders.",
         });
+        return;
       }
     }
 
     // Find orders by shop
-    let orders: IOrder[] | null = await Order.find({ shop }).populate({
-      path: "customerId",
+    const orders: IOrder[] | null = await Order.find({ shop }).populate({
+      path: "customer",
       select: "name phone",
     });
 
@@ -140,12 +133,12 @@ export const getOrdersByShop = async (
 
 // Ultimate Search Algorithm
 export const ultimateSearch = async (
-  req: UserRequest,
+  req: AuthenticatedRequest,
   res: Response
 ): Promise<void> => {
   try {
     const searchTerm = req.params.searchTerm;
-    const { userId, role } = req.user!;
+    const { userId, role, shops } = req.user!;
 
     // Validate request parameter
     if (!searchTerm) {
@@ -153,65 +146,38 @@ export const ultimateSearch = async (
       return;
     }
 
-    let customerOrders: IOrder[] | null = [];
-    let orderSearch: IOrder[] | null = [];
+    let orders: IOrder[] | null;
 
-    // For users and managers
-    if (role === "User" || role === "Manager") {
-      const user = await User.findById(userId);
-      const shops = user?.shop || [];
-
-      const customerSearch: ICustomer[] | null = await Customer.find({
+    if (role === "Admin") {
+      orders = await Order.find({
         $or: [
-          { name: { $regex: new RegExp(searchTerm, "i") } },
-          { phone: { $regex: new RegExp(searchTerm, "i") } },
+          { "customer.name": { $regex: new RegExp(searchTerm, "i") } },
+          { "customer.phone": { $regex: new RegExp(searchTerm, "i") } },
+          { order: { $regex: new RegExp(searchTerm, "i") } },
+          { bill: { $regex: new RegExp(searchTerm, "i") } },
         ],
-      });
-
-      if (customerSearch) {
-        const customerIds: string[] =
-          customerSearch.map((customer) => customer._id) || [];
-        if (role === "User") {
-          customerOrders = await Order.find({
-            customerId: { $in: customerIds },
-            creator: userId,
-          }).populate([
-            {
-              path: "customerId",
-              select: "name phone",
-            },
-            {
-              path: "creator",
-              select: "name",
-            },
-          ]);
-        } else if (role === "Manager") {
-          customerOrders = await Order.find({
-            customerId: { $in: customerIds },
-            shop: { $in: shops },
-          }).populate([
-            {
-              path: "customerId",
-              select: "name phone",
-            },
-            {
-              path: "creator",
-              select: "name",
-            },
-          ]);
-        }
-      }
-
-      // Search for orders by order ID
-      orderSearch = await Order.find({
+      }).populate([
+        {
+          path: "customer",
+          select: "name phone",
+        },
+        {
+          path: "creator",
+          select: "name",
+        },
+      ]);
+    } else if (role === "Manager" || role === "User") {
+      orders = await Order.find({
         $or: [
-          { orderNum: { $regex: new RegExp(searchTerm, "i") } },
-          { billNum: { $regex: new RegExp(searchTerm, "i") } },
+          { "customer.name": { $regex: new RegExp(searchTerm, "i") } },
+          { "customer.phone": { $regex: new RegExp(searchTerm, "i") } },
+          { order: { $regex: new RegExp(searchTerm, "i") } },
+          { bill: { $regex: new RegExp(searchTerm, "i") } },
         ],
         shop: { $in: shops },
       }).populate([
         {
-          path: "customerId",
+          path: "customer",
           select: "name phone",
         },
         {
@@ -220,58 +186,17 @@ export const ultimateSearch = async (
         },
       ]);
     } else {
-      //For *ADMIN*
-      // Search in customer's list
-      const customerSearch: ICustomer[] | null = await Customer.find({
-        $or: [
-          { name: { $regex: new RegExp(searchTerm, "i") } },
-          { phone: { $regex: new RegExp(searchTerm, "i") } },
-        ],
-      });
-      // Get customer Ids and get their orders
-      const customerIds: string[] =
-        customerSearch.map((customer) => customer._id) || [];
-      customerOrders = await Order.find({
-        customerId: { $in: customerIds },
-      }).populate([
-        {
-          path: "customerId",
-          select: "name phone",
-        },
-        {
-          path: "creator",
-          select: "name role",
-        },
-      ]);
-      // Search in order's list
-      orderSearch = await Order.find({
-        $or: [
-          { orderNum: { $regex: new RegExp(searchTerm, "i") } },
-          { billNum: { $regex: new RegExp(searchTerm, "i") } },
-        ],
-      }).populate([
-        {
-          path: "customerId",
-          select: "name phone",
-        },
-        {
-          path: "creator",
-          select: "name",
-        },
-      ]);
+      orders = [];
     }
 
-    // Combine all orders found
-    const allOrders: IOrder[] = [...customerOrders, ...orderSearch];
-
-    if (allOrders.length === 0) {
+    if (orders.length === 0) {
       res.status(404).json({
         error: "No customers or orders found with the specified search term",
       });
       return;
     }
 
-    res.json(allOrders);
+    res.json(orders);
   } catch (error) {
     console.error(error);
     res.status(500).send("Internal Server Error");
@@ -280,12 +205,12 @@ export const ultimateSearch = async (
 
 // Get orders within a date range
 export const getOrdersByDateRange = async (
-  req: UserRequest,
+  req: AuthenticatedRequest,
   res: Response
 ): Promise<void> => {
   try {
     let { startDate, endDate } = req.body;
-    const { userId, role } = req.user!;
+    const { userId, role, shops } = req.user!;
 
     if (!startDate) {
       res.status(400).json({ error: "Missing starting date!" });
@@ -299,14 +224,25 @@ export const getOrdersByDateRange = async (
 
     let orders: IOrder[] | null;
     if (role === "Manager" || role === "User") {
-      const manager = await User.findById(userId);
-      const shops = manager?.shop || [];
       orders = await Order.find({
         orderDate: { $gte: startDate, $lte: endDate },
         shop: { $in: shops },
       }).populate([
         {
-          path: "customerId",
+          path: "customer",
+          select: "name phone",
+        },
+        {
+          path: "creator",
+          select: "name",
+        },
+      ]);
+    } else if (role === "Admin") {
+      orders = await Order.find({
+        orderDate: { $gte: startDate, $lte: endDate },
+      }).populate([
+        {
+          path: "customer",
           select: "name phone",
         },
         {
@@ -315,19 +251,9 @@ export const getOrdersByDateRange = async (
         },
       ]);
     } else {
-      orders = await Order.find({
-        orderDate: { $gte: startDate, $lte: endDate },
-      }).populate([
-        {
-          path: "customerId",
-          select: "name phone",
-        },
-        {
-          path: "creator",
-          select: "name",
-        },
-      ]);
+      orders = [];
     }
+
     res.status(200).json(orders);
   } catch (error) {
     console.error(error);
@@ -335,13 +261,13 @@ export const getOrdersByDateRange = async (
   }
 };
 
-// Update order using order ID
+//TODO: Update order using order ID
 export const updateOrder = async (
-  req: UserRequest,
+  req: AuthenticatedRequest,
   res: Response
 ): Promise<void> => {
   try {
-    const { userId, role } = req.user!;
+    const { userId, role, shops } = req.user!;
     const orderId = req.params.orderId;
     const updatedFields = req.body;
 
@@ -366,9 +292,6 @@ export const updateOrder = async (
     }
 
     if (role === "Manager" || role === "User") {
-      const user = await User.findById(userId);
-      const shops = user?.shop || [];
-
       if (role === "User" && oldOrder.creator !== userId) {
         res
           .status(401)
@@ -392,7 +315,7 @@ export const updateOrder = async (
         new: true,
       }
     ).populate({
-      path: "customerId",
+      path: "customer",
       select: "name phone",
     });
 
@@ -403,13 +326,13 @@ export const updateOrder = async (
   }
 };
 
-// Update status of order
+//TODO: Update status of order
 export const updateOrderStatus = async (
-  req: UserRequest,
+  req: AuthenticatedRequest,
   res: Response
 ): Promise<void> => {
   try {
-    const { userId, role } = req.user!;
+    const { userId, role, shops } = req.user!;
     const orderId = req.params.orderId;
     const newStatus = req.body.status;
 
@@ -434,9 +357,6 @@ export const updateOrderStatus = async (
     }
 
     if (role === "Manager" || role === "User") {
-      const user = await User.findById(userId);
-      const shops = user?.shop || [];
-
       if (role === "User" && order.creator !== userId) {
         res
           .status(401)
@@ -471,39 +391,27 @@ export const updateOrderStatus = async (
 
 // Create order
 export const createOrder = async (
-  req: UserRequest,
+  req: AuthenticatedRequest,
   res: Response
 ): Promise<void> => {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
-    const { userId, role } = req.user!;
+    const { userId, role, shops } = req.user!;
 
-    const {
-      orderNum,
-      orderDate,
-      trialDate,
-      deliveryDate,
-      name,
-      phone,
-      products,
-      status,
-      measurements,
-      shop,
-    } = req.body;
+    const { order, dates, name, phone, products, status, shop, measurements } =
+      req.body;
 
     // Validate request body
     if (
-      !orderNum ||
-      !orderDate ||
-      !trialDate ||
-      !deliveryDate ||
+      !order ||
+      !dates ||
       !name ||
       !phone ||
       !products ||
       !status ||
-      !measurements ||
-      !shop
+      !shop ||
+      !measurements
     ) {
       res
         .status(400)
@@ -512,16 +420,15 @@ export const createOrder = async (
     }
 
     // Check if any order with same order number and shop exists.
-    let order: IOrder | null = await Order.findOne({
-      $and: [{ orderNum }, { shop }],
+    const existingOrder: IOrder | null = await Order.findOne({
+      $and: [{ order }, { shop }],
     });
-    if (order) {
+    if (existingOrder) {
       res.status(403).json({ error: "Order already exist." });
       return;
     }
 
-    const user: IUser | null = await User.findById(userId);
-    if (role !== "Admin" && !user?.shop.includes(shop)) {
+    if (role !== "Admin" && shops.includes(shop)) {
       res
         .status(401)
         .json({ error: "Unauthorised: You can not add order for this shop." });
@@ -536,16 +443,12 @@ export const createOrder = async (
       customer = await newCustomer.save();
     }
 
-    const customerId = customer._id;
-
     // Create a new order using the customer ID
     const newOrder = new Order({
-      orderNum,
-      orderDate,
-      customerId,
+      order,
+      dates,
+      customer: customer._id,
       products,
-      trialDate,
-      deliveryDate,
       status,
       shop,
       measurements,
@@ -561,6 +464,7 @@ export const createOrder = async (
     await customer.save();
 
     // Save order ID in user
+    let user: IUser | null = await User.findById(userId);
     if (user) {
       user.orders.push(savedOrder._id);
       await user.save();
@@ -582,30 +486,27 @@ export const createOrder = async (
 
 // Delete order by ID
 export const deleteOrderById = async (
-  req: UserRequest,
+  req: AuthenticatedRequest,
   res: Response
 ): Promise<void> => {
-  const _id = req.params._id;
-  const { userId, role } = req.user!;
+  const orderId = req.params._id;
+  const { userId, role, shops } = req.user!;
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
     // Find the order to get related user and customer information
-    const orderToDelete: IOrder | null = await Order.findById(_id);
+    const orderToDelete: IOrder | null = await Order.findById(orderId);
 
     if (!orderToDelete) {
       res.status(404).json({ error: "Order not found" });
       return;
     }
-    if (role === "Manager") {
-      const manager: IUser | null = await User.findById(userId);
-
-      if (!manager?.shop.includes(orderToDelete.shop)) {
-        await session.abortTransaction();
-        res.status(401).json({
-          error: "Unauthorized: This order does not belong to you shop.",
-        });
-      }
+    if (role === "Manager" && shops.includes(orderToDelete.shop)) {
+      await session.abortTransaction();
+      res.status(401).json({
+        error: "Unauthorized: This order does not belong to you shop.",
+      });
+      return;
     }
 
     try {
@@ -621,7 +522,7 @@ export const deleteOrderById = async (
 
       // Remove the order ID from the customer's orders array
       await Customer.findByIdAndUpdate(
-        { _id: orderToDelete.customerId },
+        { _id: orderToDelete.customer },
         {
           $pullAll: {
             orders: [orderToDelete._id],
@@ -630,7 +531,7 @@ export const deleteOrderById = async (
       );
 
       // Delete the order
-      await Order.findByIdAndDelete(_id);
+      await Order.findByIdAndDelete(orderId);
 
       // Commit the transaction
       await session.commitTransaction();

@@ -11,7 +11,6 @@ import {
   getCurrentUser,
   getUserById,
   getUserByName,
-  getUserOrders,
   updatePassword,
   updateUserDetails,
   updateUserShop,
@@ -43,9 +42,6 @@ userRouter.get("/search/:name", verifyToken, isAdminOrManager, getUserByName);
 
 // Get unique shops (Admin/Manager)
 userRouter.get("/shop-list", verifyToken, isAdminOrManager, getAllUniqueShops);
-
-// Get all orders of a specific user
-userRouter.get("/orders/:userId", verifyToken, isAuthenticated, getUserOrders);
 
 //* PUT routes
 // Update user password (Admin)

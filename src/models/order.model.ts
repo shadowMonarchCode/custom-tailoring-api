@@ -45,18 +45,27 @@ interface IMeasurement {
   jacket: IJacket | null;
 }
 
+interface Dates {
+  order: Date;
+  trial: Date;
+  delivery: Date;
+  completion: Date | null;
+  cancelled: Date | null;
+}
+
+interface Customer {
+  name: string;
+  phone: string;
+}
+
 export interface IOrder extends Document {
-  orderNum: string;
-  orderDate: Date;
-  trialDate: Date;
-  deliveryDate: Date;
-  completionDate: Date | null;
-  cancellationDate: Date | null;
-  customerId: string;
+  order: string;
+  dates: Dates;
+  customer: Customer | string;
   products: IProduct[];
   status: string;
   shop: string;
-  billNum: string;
+  bill: string;
   measurements: IMeasurement;
   creator: string;
 }
@@ -122,14 +131,18 @@ const productSchema = new Schema({
   amount: { type: Number, default: 1 },
 });
 
+const datesSchema = new Schema({
+  order: { type: Date, required: true },
+  trial: { type: Date, required: true },
+  delivery: { type: Date, required: true },
+  completion: { type: Date, default: null },
+  cancellation: { type: Date, default: null },
+});
+
 const orderSchema = new Schema({
-  orderNum: { type: String, required: true },
-  orderDate: { type: Date, required: true },
-  trialDate: { type: Date, required: true },
-  deliveryDate: { type: Date, required: true },
-  completionDate: { type: Date, default: null },
-  cancellationDate: { type: Date, default: null },
-  customerId: {
+  order: { type: String, required: true },
+  dates: { type: datesSchema },
+  customer: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Customer",
     required: true,
@@ -141,7 +154,7 @@ const orderSchema = new Schema({
     enum: ["Trial", "Finished", "Pending", "Completed", "Cancelled"],
   },
   shop: { type: String, required: true },
-  billNum: { type: String, default: "" },
+  bill: { type: String, default: "" },
   measurements: { type: measurementSchema },
   creator: {
     type: mongoose.Schema.Types.ObjectId,
@@ -149,7 +162,8 @@ const orderSchema = new Schema({
     required: true,
   },
 });
-orderSchema.index({ shop: 1, orderNum: 1 }, { unique: true });
+
+orderSchema.index({ shop: 1, order: 1 }, { unique: true });
 
 const Order = mongoose.model<IOrder>("Order", orderSchema);
 

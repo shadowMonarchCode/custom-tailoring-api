@@ -1,8 +1,9 @@
 import { Request } from "express";
 
-export interface UserRequest extends Request {
+export interface AuthenticatedRequest extends Request {
   user?: {
     userId: string;
     role: string;
+    shops: string[];
   };
 }

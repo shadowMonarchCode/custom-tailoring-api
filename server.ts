@@ -10,10 +10,6 @@ import customerRouter from "./src/routes/customer.router";
 const app = express();
 const port = process.env.PORT || 8000;
 
-// const options: cors.CorsOptions = {
-//   origin: ["http://localhost:5173"],
-// };
-
 app.use(express.json());
 app.use(cors());
 

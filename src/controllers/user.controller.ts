@@ -4,41 +4,33 @@ import User, { IUser } from "../models/user.model";
 
 // Importing authentication and password hashing utilities
 import { authenticate, hashPassword } from "../utils";
-import { UserRequest } from "../types";
+import { AuthenticatedRequest } from "../types";
 import Order, { IOrder } from "../models/order.model";
 
 // Get current user details
 export const getCurrentUser = async (
-  req: UserRequest,
+  req: AuthenticatedRequest,
   res: Response
 ): Promise<void> => {
   try {
     const { userId } = req.user!;
-    const user: IUser | null = await User.findById(userId).populate({
-      path: "orders",
-      select: "",
-      populate: {
-        path: "customerId",
-        select: "name phone",
-      },
-    });
+    const user: IUser | null = await User.findById(userId)
+      .select("-password")
+      .populate({
+        path: "orders",
+        select: "",
+        populate: {
+          path: "customerId",
+          select: "name phone",
+        },
+      });
 
     if (!user) {
       res.status(404).json({ error: "User not found" });
       return;
     }
 
-    const userWithoutPassword = {
-      _id: user._id,
-      name: user.name,
-      username: user.username,
-      email: user.email,
-      role: user.role,
-      order: user.orders,
-      shop: user.shop,
-    };
-
-    res.status(200).json(userWithoutPassword);
+    res.status(200).json(user);
   } catch (error) {
     console.error(error);
     res.status(500).send("Internal Server Error");
@@ -47,26 +39,50 @@ export const getCurrentUser = async (
 
 // Get list of all users based on role
 export const getAllUsers = async (
-  req: UserRequest,
+  req: AuthenticatedRequest,
   res: Response
 ): Promise<void> => {
   try {
-    const { userId, role } = req.user!;
+    const { userId, role, shops } = req.user!;
     let users: IUser[] | null;
 
     if (role === "Admin") {
       // Admin can see all users
-      users = await User.find();
+      users = await User.find()
+        .select("-password")
+        .populate({
+          path: "orders",
+          select: "-measurements",
+          populate: [
+            {
+              path: "customer",
+              select: "name phone",
+            },
+            {
+              path: "creator",
+              select: "name",
+            },
+          ],
+        });
     } else if (role === "Manager") {
-      const requestingUser: IUser | null = await User.findById(userId);
-      const shops = requestingUser?.shop || [];
       // Manager can see users within their shop
-      users = await User.find({ shop: { $in: shops } }).populate({
-        path: "orders",
-        select: "",
-      });
+      users = await User.find({ shop: { $in: shops } })
+        .select("-password")
+        .populate({
+          path: "orders",
+          select: "-measurements",
+          populate: [
+            {
+              path: "customer",
+              select: "name phone",
+            },
+            {
+              path: "creator",
+              select: "name",
+            },
+          ],
+        });
     } else {
-      // For other roles, return an empty array or handle as needed
       users = [];
     }
 
@@ -75,17 +91,7 @@ export const getAllUsers = async (
       return;
     }
 
-    const usersWithoutPassword = users.map((user) => ({
-      _id: user._id,
-      name: user.name,
-      username: user.username,
-      email: user.email,
-      orders: user.orders,
-      shop: user.shop,
-      role: user.role,
-    }));
-
-    res.status(200).json(usersWithoutPassword);
+    res.status(200).json(users);
   } catch (error) {
     console.error(error);
     res
@@ -96,45 +102,42 @@ export const getAllUsers = async (
 
 // Get user by ID
 export const getUserById = async (
-  req: UserRequest,
+  req: AuthenticatedRequest,
   res: Response
 ): Promise<void> => {
   try {
-    const { userId, role } = req.user!;
+    const { userId, role, shops } = req.user!;
     const targetUserId = req.params.userId;
 
     // Admin can get any user by ID
-    const user: IUser | null = await User.findById(targetUserId);
+    const user: IUser | null = await User.findById(targetUserId)
+      .select("-password")
+      .populate({
+        path: "orders",
+        select: "-measurements",
+        populate: {
+          path: "customer",
+          select: "name phone",
+        },
+      });
     if (!user) {
       res.status(404).json({ error: "No user found with the specified ID" });
       return;
     }
 
     // Check access for Managers
-    if (role === "Manager") {
-      const manager = await User.findById(userId);
-      const managerShop = manager?.shop || [];
-
-      if (
-        user.role === "Admin" ||
-        !user.shop.some((shop) => managerShop.includes(shop))
-      )
-        res
-          .status(401)
-          .json({ error: "Unauthorized: You do not have access to this user" });
+    if (
+      role === "Manager" &&
+      (user.role === "Admin" ||
+        !user.shops.some((shop) => shops.includes(shop)))
+    ) {
+      res
+        .status(401)
+        .json({ error: "Unauthorized: You do not have access to this user" });
+      return;
     }
 
-    const userWithoutPassword = {
-      _id: user._id,
-      name: user.name,
-      username: user.username,
-      email: user.email,
-      role: user.role,
-      order: user.orders,
-      shop: user.shop,
-    };
-
-    res.json(userWithoutPassword);
+    res.json(user);
   } catch (error) {
     console.error(error);
     res
@@ -145,25 +148,32 @@ export const getUserById = async (
 
 // Get user(s) by name
 export const getUserByName = async (
-  req: UserRequest,
+  req: AuthenticatedRequest,
   res: Response
 ): Promise<void> => {
   try {
-    const { userId, role } = req.user!;
+    const { userId, role, shops } = req.user!;
     const targetName = req.params.name;
 
     let users = await User.find({
       name: { $regex: new RegExp(targetName, "i") },
-    });
+    })
+      .select("-password")
+      .populate({
+        path: "orders",
+        select: "-measurements",
+        populate: {
+          path: "customer",
+          select: "name phone",
+        },
+      });
 
     // Filter users based on role and shop for Managers
     if (role === "Manager") {
-      const manager = await User.findById(userId);
-      const managerShop = manager?.shop || [];
       users = users.filter(
         (user) =>
           user.role !== "Admin" &&
-          user.shop.some((shop) => managerShop.includes(shop))
+          user.shops.some((shop) => shops.includes(shop))
       );
     }
 
@@ -172,17 +182,7 @@ export const getUserByName = async (
       return;
     }
 
-    const usersWithoutPassword = users.map((user) => ({
-      _id: user._id,
-      name: user.name,
-      username: user.username,
-      email: user.email,
-      orders: user.orders,
-      shop: user.shop,
-      role: user.role,
-    }));
-
-    res.status(200).json(usersWithoutPassword);
+    res.status(200).json(users);
   } catch (error) {
     console.error(error);
     res
@@ -193,17 +193,16 @@ export const getUserByName = async (
 
 // Get all unique shops
 export const getAllUniqueShops = async (
-  req: UserRequest,
+  req: AuthenticatedRequest,
   res: Response
 ): Promise<void> => {
   try {
-    const { userId, role } = req.user!;
+    const { userId, role, shops } = req.user!;
 
     let uniqueShops: string[];
 
     if (role === "Manager") {
-      const managerDetails: IUser | null = await User.findById(userId);
-      uniqueShops = managerDetails?.shop || [];
+      uniqueShops = shops;
     } else {
       uniqueShops = await User.distinct("shop");
     }
@@ -215,49 +214,12 @@ export const getAllUniqueShops = async (
   }
 };
 
-// Get all orders of a user
-export const getUserOrders = async (
-  req: UserRequest,
-  res: Response
-): Promise<void> => {
-  try {
-    const { userId, role } = req.user!;
-    const id = req.params.userId;
-
-    let orders: IOrder[] | null;
-
-    // Filter users based on role and shop for Managers
-    if (role === "Admin") {
-      orders = await Order.find({ creator: id });
-    } else if (role === "Manager" || role === "User") {
-      const manager = await User.findById(userId);
-      const shops = manager?.shop || [];
-
-      orders = await Order.find({ creator: id, shop: { $in: shops } });
-    } else {
-      orders = [];
-    }
-
-    if (orders.length === 0) {
-      res.status(404).json({ error: "No order found with the specified user" });
-      return;
-    }
-
-    res.status(200).json(orders);
-  } catch (error) {
-    console.error(error);
-    res
-      .status(500)
-      .json({ error: "Something went wrong. Please try again later!" });
-  }
-};
-
 // Update user password
 export const updatePassword = async (
-  req: UserRequest,
+  req: AuthenticatedRequest,
   res: Response
 ): Promise<void> => {
-  const { userId, role } = req.user!;
+  const { userId, role, shops } = req.user!;
   const { _id, newPassword } = req.body;
 
   try {
@@ -269,18 +231,20 @@ export const updatePassword = async (
     }
 
     // Managers can only update passwords for users in their own shop
-    if (role === "Manager") {
-      const manager: IUser | null = await User.findById(userId);
-      const managerShop = manager?.shop || [];
-      if (!user.shop.some((shop) => managerShop.includes(shop))) {
-        res.status(403).json({
-          error: "Unauthorized: Cannot update password for this user",
-        });
-        return;
-      }
+    if (
+      role === "Manager" &&
+      !user.shops.some((shop) => shops.includes(shop))
+    ) {
+      res.status(403).json({
+        error: "Unauthorized: Cannot update password for this user",
+      });
+      return;
     }
 
-    user.password = newPassword;
+    // Hash the password before saving
+    const hashedPassword: string = await hashPassword(newPassword);
+
+    user.password = hashedPassword;
     await user.save();
 
     res.status(200).json({ message: "Password updated successfully" });
@@ -290,12 +254,12 @@ export const updatePassword = async (
   }
 };
 
-// Update user details
+//TODO: Update user details
 export const updateUserDetails = async (
-  req: UserRequest,
+  req: AuthenticatedRequest,
   res: Response
 ): Promise<void> => {
-  const { userId, role } = req.user!;
+  const { userId, role, shops } = req.user!;
   const { _id, newName, newEmail } = req.body;
 
   try {
@@ -308,9 +272,7 @@ export const updateUserDetails = async (
 
     // Managers can only update details for users in their own shop
     if (role === "Manager") {
-      const manager: IUser | null = await User.findById(userId);
-      const managerShop = manager?.shop || [];
-      if (!user.shop.some((shop) => managerShop.includes(shop))) {
+      if (!user.shops.some((shop) => shops.includes(shop))) {
         res.status(403).json({
           error: "Unauthorized: Cannot update details for this user",
         });
@@ -342,12 +304,12 @@ export const updateUserDetails = async (
   }
 };
 
-// Update user shop
+//TODO: Update user shop
 export const updateUserShop = async (
-  req: UserRequest,
+  req: AuthenticatedRequest,
   res: Response
 ): Promise<void> => {
-  const { userId, role } = req.user!;
+  const { userId, role, shops } = req.user!;
   const { _id, newShop } = req.body;
 
   try {
@@ -358,21 +320,18 @@ export const updateUserShop = async (
       return;
     }
 
-    // Managers can only update shop for users in their own shop
-    if (role === "Manager") {
-      const manager: IUser | null = await User.findById(userId);
-      const managerShop = manager?.shop || [];
-
-      // Check if user is of their own shop
-      if (!user.shop.some((shop) => managerShop.includes(shop))) {
-        res.status(403).json({
-          error: "Unauthorized: Cannot update shop for this user",
-        });
-        return;
-      }
+    if (
+      role !== "Admin" &&
+      !shops.includes(newShop) &&
+      !user.shops.some((shop) => shops.includes(shop))
+    ) {
+      res.status(403).json({
+        error: "Unauthorized: Cannot update shop for this user",
+      });
+      return;
     }
 
-    user.shop = newShop;
+    user.shops = newShop;
     await user.save();
 
     res.status(200).json({ message: "Shop updated successfully" });
@@ -388,11 +347,11 @@ export const createUser = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { name, email, password, shop, role } = req.body;
+    const { name, email, password, shops, role } = req.body;
 
     // Validate request body
     if (!name || !email || !password || !role) {
-      res.status(400).json({ error: "Missing required fields" });
+      res.status(400).json({ error: "Missing required field(s)." });
       return;
     }
 
@@ -423,7 +382,7 @@ export const createUser = async (
       username,
       email,
       password: hashedPassword,
-      shop,
+      shops,
       role,
     });
 
@@ -434,7 +393,7 @@ export const createUser = async (
       name: savedUser.name,
       username: savedUser.username,
       email: savedUser.email,
-      shop: savedUser.shop,
+      shops: savedUser.shops,
       role: savedUser.role,
     });
   } catch (error) {
@@ -463,12 +422,13 @@ export const authenticateUser = async (
       password,
       user.password,
       user._id,
-      user.role
+      user.role,
+      user.shops
     );
 
     if (token) {
       // Authentication successful, send the token back to the client
-      res.json({ token });
+      res.status(202).json({ token });
     } else {
       // Authentication failed
       res.status(401).json({ error: "Authentication failed" });
@@ -481,10 +441,10 @@ export const authenticateUser = async (
 
 // Delete user by ID
 export const deleteUserById = async (
-  req: UserRequest,
+  req: AuthenticatedRequest,
   res: Response
 ): Promise<void> => {
-  const { userId, role } = req.user!;
+  const { userId, role, shops } = req.user!;
   const targetUserId = req.params.userId;
 
   try {
@@ -496,15 +456,14 @@ export const deleteUserById = async (
     }
 
     // Managers can only delete users in their own shop
-    if (role === "Manager") {
-      const manager: IUser | null = await User.findById(userId);
-      const managerShop = manager?.shop || [];
-      if (!targetUser.shop.some((shop) => managerShop.includes(shop))) {
-        res.status(403).json({
-          error: "Unauthorized: Cannot delete this user",
-        });
-        return;
-      }
+    if (
+      role === "Manager" &&
+      !targetUser.shops.some((shop) => shops.includes(shop))
+    ) {
+      res.status(403).json({
+        error: "Unauthorized: Cannot delete this user",
+      });
+      return;
     }
 
     // Delete the user

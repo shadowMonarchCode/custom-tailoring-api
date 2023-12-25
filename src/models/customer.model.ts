@@ -32,9 +32,9 @@ interface IJacket {
 }
 
 interface IMeasurement {
-  shirt: IShirt;
-  trouser: ITrouser;
-  jacket: IJacket;
+  shirt: IShirt | null;
+  trouser: ITrouser | null;
+  jacket: IJacket | null;
 }
 
 export interface ICustomer extends Document {
@@ -45,40 +45,40 @@ export interface ICustomer extends Document {
 }
 
 const shirtSchema = new Schema({
-  shoulder: { type: Number, default: 0.0 },
-  sleeveLength: { type: Number, default: 0.0 },
-  chest: { type: Number, default: 0.0 },
-  waist: { type: Number, default: 0.0 },
-  hip: { type: Number, default: 0.0 },
-  neck: { type: Number, default: 0.0 },
+  shoulder: { type: Number },
+  sleeveLength: { type: Number },
+  chest: { type: Number },
+  waist: { type: Number },
+  hip: { type: Number },
+  neck: { type: Number },
 });
 
 const trouserSchema = new Schema({
-  length: { type: Number, default: 0.0 },
-  crotch: { type: Number, default: 0.0 },
-  waist: { type: Number, default: 0.0 },
-  hip: { type: Number, default: 0.0 },
-  thigh: { type: Number, default: 0.0 },
-  knee: { type: Number, default: 0.0 },
-  bottom: { type: Number, default: 0.0 },
-  fLow: { type: Number, default: 0.0 },
+  length: { type: Number },
+  crotch: { type: Number },
+  waist: { type: Number },
+  hip: { type: Number },
+  thigh: { type: Number },
+  knee: { type: Number },
+  bottom: { type: Number },
+  fLow: { type: Number },
 });
 
 const jacketSchema = new Schema({
-  length: { type: Number, default: 0.0 },
-  shoulder: { type: Number, default: 0.0 },
-  sleeveLength: { type: Number, default: 0.0 },
-  chest: { type: Number, default: 0.0 },
-  waist: { type: Number, default: 0.0 },
-  hip: { type: Number, default: 0.0 },
-  neck: { type: Number, default: 0.0 },
-  crossBack: { type: Number, default: 0.0 },
+  length: { type: Number },
+  shoulder: { type: Number },
+  sleeveLength: { type: Number },
+  chest: { type: Number },
+  waist: { type: Number },
+  hip: { type: Number },
+  neck: { type: Number },
+  crossBack: { type: Number },
 });
 
 const measurementSchema = new Schema({
-  shirt: { type: shirtSchema, default: {} },
-  trouser: { type: trouserSchema, default: {} },
-  jacket: { type: jacketSchema, default: {} },
+  shirt: { type: shirtSchema, default: null },
+  trouser: { type: trouserSchema, default: null },
+  jacket: { type: jacketSchema, default: null },
 });
 
 const customerSchema = new Schema({
