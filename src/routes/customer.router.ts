@@ -28,6 +28,6 @@ customerRouter.get(
 // * POST Route
 
 //* DELETE Route
-customerRouter.get("/delete/:customerId");
+// customerRouter.get("/delete/:customerId");
 
 export default customerRouter;

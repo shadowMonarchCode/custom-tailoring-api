@@ -20,7 +20,7 @@ export const getCurrentUser = async (
         path: "orders",
         select: "",
         populate: {
-          path: "customerId",
+          path: "customer",
           select: "name phone",
         },
       });

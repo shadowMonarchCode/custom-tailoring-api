@@ -378,7 +378,7 @@ export const updateOrderStatus = async (
       { status: newStatus },
       { new: true }
     ).populate({
-      path: "customerId",
+      path: "customer",
       select: "name phone",
     });
 
