@@ -95,29 +95,21 @@ export const getOrdersByShop = async (
   res: Response
 ): Promise<void> => {
   try {
-    const shop = req.params.shop;
     const { userId, role, shops } = req.user!;
 
-    // Validate request parameter
-    if (!shop) {
-      res.status(400).json({ error: "Shop number parameter is required" });
-      return;
-    }
-
-    if (role === "Manager" || role === "User") {
-      if (!shops.includes(shop)) {
-        res.status(401).json({
-          error: "Unauthorized: You can not view this shop's orders.",
-        });
-        return;
-      }
-    }
-
     // Find orders by shop
-    const orders: IOrder[] | null = await Order.find({ shop }).populate({
-      path: "customer",
-      select: "name phone",
-    });
+    const orders: IOrder[] | null = await Order.find({
+      shop: { $in: shops },
+    }).populate([
+      {
+        path: "customer",
+        select: "name phone",
+      },
+      {
+        path: "creator",
+        select: "name",
+      },
+    ]);
 
     if (orders.length === 0) {
       res.status(404).json({ error: "No orders found for the specified shop" });
@@ -401,7 +393,7 @@ export const createOrder = async (
 
     const { order, dates, name, phone, products, status, shop, measurements } =
       req.body;
-
+    console.log(req.body);
     // Validate request body
     if (
       !order ||
@@ -428,7 +420,7 @@ export const createOrder = async (
       return;
     }
 
-    if (role !== "Admin" && shops.includes(shop)) {
+    if (role !== "Admin" && !shops.includes(shop)) {
       res
         .status(401)
         .json({ error: "Unauthorised: You can not add order for this shop." });

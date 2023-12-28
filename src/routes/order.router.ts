@@ -17,7 +17,7 @@ const orderRouter: Router = express.Router();
 //* GET Route
 orderRouter.get("/all", verifyToken, isAuthenticated, getAllOrders);
 orderRouter.get("/get/:orderId", verifyToken, isAuthenticated, getOrderById);
-orderRouter.get("/shop/:shop", verifyToken, isAuthenticated, getOrdersByShop);
+orderRouter.get("/shop", verifyToken, isAuthenticated, getOrdersByShop);
 orderRouter.get(
   "/search/:searchTerm",
   verifyToken,
