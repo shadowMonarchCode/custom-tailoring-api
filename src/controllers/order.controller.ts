@@ -75,7 +75,7 @@ export const getOrderById = async (
     }
 
     // Check if shop matches them manager
-    if (role === "Manager" && shops.includes(order.shop)) {
+    if (role === "Manager" && !shops.includes(order.shop)) {
       res
         .status(401)
         .json({ error: "Unauthorized: You can't access this order." });
