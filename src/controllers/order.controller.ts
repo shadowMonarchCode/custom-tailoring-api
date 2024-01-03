@@ -3,7 +3,7 @@ import Order, { IOrder } from "../models/order.model";
 import Customer, { ICustomer } from "../models/customer.model";
 import User, { IUser } from "../models/user.model";
 import mongoose from "mongoose";
-import { AuthenticatedRequest } from "../types";
+import { AuthenticatedRequest, INewOrder } from "../types";
 
 // Get all orders
 export const getAllOrders = async (
@@ -96,10 +96,11 @@ export const getOrdersByShop = async (
 ): Promise<void> => {
   try {
     const { userId, role, shops } = req.user!;
+    const { shopNum } = req.params;
 
     // Find orders by shop
     const orders: IOrder[] | null = await Order.find({
-      shop: { $in: shops },
+      shop: shopNum,
     }).populate([
       {
         path: "customer",
@@ -120,6 +121,39 @@ export const getOrdersByShop = async (
   } catch (error) {
     console.error(error);
     res.status(500).send("Internal Server Error");
+  }
+};
+
+// Get all my orders
+export const getAllMyOrders = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { userId, role, shops } = req.user!;
+
+    const orders = await Order.find({
+      creator: userId,
+    }).populate([
+      {
+        path: "customer",
+        select: "name phone",
+      },
+      {
+        path: "creator",
+        select: "name",
+      },
+    ]);
+    
+    if (orders.length === 0) {
+      res.status(404).json({ error: "No orders found for the specified shop" });
+      return;
+    }
+
+    res.json(orders);
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
@@ -391,23 +425,78 @@ export const createOrder = async (
   try {
     const { userId, role, shops } = req.user!;
 
-    const { order, dates, name, phone, products, status, shop, measurements } =
-      req.body;
-    console.log(req.body);
-    // Validate request body
-    if (
-      !order ||
-      !dates ||
-      !name ||
-      !phone ||
-      !products ||
-      !status ||
-      !shop ||
-      !measurements
-    ) {
+    const {
+      order,
+      dates,
+      customer,
+      products,
+      status,
+      shop,
+      measurements,
+      creator,
+    } = req.body.order;
+    // console.log(req.body.order.dates);
+    //TODO Validate request body
+    // if (
+    //   !order ||
+    //   !dates ||
+    //   !customer ||
+    //   !products ||
+    //   !status ||
+    //   !shop ||
+    //   !creator
+    // ) {
+    //   res
+    //     .status(400)
+    //     .json({ error: "Missing required fields in the request body" });
+    //   return;
+    // }
+    if (!order) {
       res
         .status(400)
-        .json({ error: "Missing required fields in the request body" });
+        .json({ error: "Missing 'order' field in the request body" });
+      return;
+    }
+
+    if (!dates) {
+      res
+        .status(400)
+        .json({ error: "Missing 'dates' field in the request body" });
+      return;
+    }
+
+    if (!customer) {
+      res
+        .status(400)
+        .json({ error: "Missing 'customer' field in the request body" });
+      return;
+    }
+
+    if (!products) {
+      res
+        .status(400)
+        .json({ error: "Missing 'products' field in the request body" });
+      return;
+    }
+
+    if (!status) {
+      res
+        .status(400)
+        .json({ error: "Missing 'status' field in the request body" });
+      return;
+    }
+
+    if (!shop) {
+      res
+        .status(400)
+        .json({ error: "Missing 'shop' field in the request body" });
+      return;
+    }
+
+    if (!creator) {
+      res
+        .status(400)
+        .json({ error: "Missing 'creator' field in the request body" });
       return;
     }
 
@@ -426,37 +515,38 @@ export const createOrder = async (
         .json({ error: "Unauthorised: You can not add order for this shop." });
     }
 
+    const { name, phone } = customer;
     // Check if the customer with the given phone number exists
-    let customer: ICustomer | null = await Customer.findOne({ phone });
+    let searchcustomer: ICustomer | null = await Customer.findOne({ phone });
 
     // If the customer doesn't exist, create a new customer
-    if (!customer) {
+    if (!searchcustomer) {
       const newCustomer = new Customer({ name, phone });
-      customer = await newCustomer.save();
+      searchcustomer = await newCustomer.save();
     }
 
     // Create a new order using the customer ID
     const newOrder = new Order({
       order,
       dates,
-      customer: customer._id,
+      customer: searchcustomer._id,
       products,
       status,
       shop,
       measurements,
-      creator: userId,
+      creator,
     });
 
     // Save the new order
     const savedOrder: IOrder = await newOrder.save();
 
     // Save order ID and update measurements in user
-    customer.orders.push(savedOrder._id);
-    customer.measurements = measurements;
-    await customer.save();
+    searchcustomer.orders.push(savedOrder._id);
+    searchcustomer.measurements = measurements;
+    await searchcustomer.save();
 
     // Save order ID in user
-    let user: IUser | null = await User.findById(userId);
+    let user: IUser | null = await User.findById(creator);
     if (user) {
       user.orders.push(savedOrder._id);
       await user.save();

@@ -18,7 +18,7 @@ export const getCurrentUser = async (
       .select("-password")
       .populate({
         path: "orders",
-        select: "",
+        select: "-measurements",
         populate: {
           path: "customer",
           select: "name phone",
@@ -414,7 +414,7 @@ export const authenticateUser = async (
     const user: IUser | null = await User.findOne({ username });
     // If the user is not found, return null
     if (!user) {
-      res.status(404).json({ error: "User not found" });
+      res.status(404).json({ error: "Incorrect username!" });
       return;
     }
 

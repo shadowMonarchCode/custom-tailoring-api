@@ -1,142 +1,118 @@
 import mongoose, { Document, Schema } from "mongoose";
 
-interface IShirt {
-  shoulder: number;
-  sleeveLength: number;
-  chest: number;
-  waist: number;
-  hip: number;
-  neck: number;
-  remark: string;
-}
-
-interface ITrouser {
-  length: number;
-  crotch: number;
-  waist: number;
-  hip: number;
-  thigh: number;
-  knee: number;
-  bottom: number;
-  fLow: number;
-  remark: string;
-}
-
-interface IJacket {
-  length: number;
-  shoulder: number;
-  sleeveLength: number;
-  chest: number;
-  waist: number;
-  hip: number;
-  neck: number;
-  crossBack: number;
-  remark: string;
-}
-
-interface IProduct {
-  type: string;
-  amount: number;
-}
-
-interface IMeasurement {
-  shirt: IShirt | null;
-  trouser: ITrouser | null;
-  jacket: IJacket | null;
+interface IMeasurements {
+  shirt?: {
+    length: number;
+    shoulder: number;
+    sleeveLength: number;
+    chest: number;
+    waist: number;
+    hip: number;
+    neck: number;
+    remark?: string;
+  };
+  trouser?: {
+    length: number;
+    crotch: number;
+    waist: number;
+    hip: number;
+    thigh: number;
+    knee: number;
+    bottom: number;
+    fLow: number;
+    remark?: string;
+  };
+  jacket?: {
+    length: number;
+    shoulder: number;
+    sleeveLength: number;
+    chest: number;
+    waist: number;
+    hip: number;
+    neck: number;
+    crossBack: number;
+    remark?: string;
+  };
 }
 
 interface Dates {
   order: Date;
   trial: Date;
   delivery: Date;
-  completion: Date | null;
-  cancelled: Date | null;
-}
-
-interface Customer {
-  name: string;
-  phone: string;
+  completion?: Date;
+  cancelled?: Date;
 }
 
 export interface IOrder extends Document {
   order: string;
   dates: Dates;
-  customer: Customer | string;
-  products: IProduct[];
+  customer: string;
+  products: {
+    product: string;
+    quantity: number;
+  }[];
   status: string;
   shop: string;
-  bill: string;
-  measurements: IMeasurement;
+  bill?: string;
+  measurements: IMeasurements;
   creator: string;
 }
 
-const shirtSchema = new Schema({
-  shoulder: { type: Number },
-  sleeveLength: { type: Number },
-  chest: { type: Number },
-  waist: { type: Number },
-  hip: { type: Number },
-  neck: { type: Number },
-  remark: { type: String },
-});
-
-const trouserSchema = new Schema({
-  length: { type: Number },
-  crotch: { type: Number },
-  waist: { type: Number },
-  hip: { type: Number },
-  thigh: { type: Number },
-  knee: { type: Number },
-  bottom: { type: Number },
-  fLow: { type: Number },
-  remark: { type: String },
-});
-
-const jacketSchema = new Schema({
-  length: { type: Number },
-  shoulder: { type: Number },
-  sleeveLength: { type: Number },
-  chest: { type: Number },
-  waist: { type: Number },
-  hip: { type: Number },
-  neck: { type: Number },
-  crossBack: { type: Number },
-  remark: { type: String },
-});
-
-const measurementSchema = new Schema({
-  shirt: { type: shirtSchema, default: null },
-  trouser: { type: trouserSchema, default: null },
-  jacket: { type: jacketSchema, default: null },
-});
-
-const productSchema = new Schema({
-  type: {
-    type: String,
-    required: true,
-    enum: [
-      "Jacket",
-      "Jawar Bundi",
-      "Kurta",
-      "Pajama",
-      "Sherwani",
-      "Shirt",
-      "Suit 2pc",
-      "Suit 3pc",
-      "Trouser",
-      "Tuxedo",
-      "Vest Coat",
-    ],
-  },
-  amount: { type: Number, default: 1 },
-});
-
-const datesSchema = new Schema({
+const datesSchema = new mongoose.Schema({
   order: { type: Date, required: true },
   trial: { type: Date, required: true },
   delivery: { type: Date, required: true },
-  completion: { type: Date, default: null },
-  cancellation: { type: Date, default: null },
+  completion: { type: Date },
+  cancelled: { type: Date },
+});
+
+const shirtSchema = new mongoose.Schema({
+  length: { type: Number, required: true },
+  shoulder: { type: Number, required: true },
+  sleeveLength: { type: Number, required: true },
+  chest: { type: Number, required: true },
+  waist: { type: Number, required: true },
+  hip: { type: Number, required: true },
+  neck: { type: Number, required: true },
+  remark: { type: String },
+});
+
+const trouserSchema = new mongoose.Schema({
+  length: { type: Number, required: true },
+  crotch: { type: Number, required: true },
+  waist: { type: Number, required: true },
+  hip: { type: Number, required: true },
+  thigh: { type: Number, required: true },
+  knee: { type: Number, required: true },
+  bottom: { type: Number, required: true },
+  fLow: { type: Number, required: true },
+  remark: { type: String },
+});
+
+const jacketSchema = new mongoose.Schema({
+  length: { type: Number, required: true },
+  shoulder: { type: Number, required: true },
+  sleeveLength: { type: Number, required: true },
+  chest: { type: Number, required: true },
+  waist: { type: Number, required: true },
+  hip: { type: Number, required: true },
+  neck: { type: Number, required: true },
+  crossBack: { type: Number, required: true },
+  remark: { type: String },
+});
+
+const measurementsSchema = new mongoose.Schema({
+  shirt: shirtSchema,
+  trouser: trouserSchema,
+  jacket: jacketSchema,
+});
+
+const productSchema = new Schema({
+  product: {
+    type: String,
+    required: true,
+  },
+  quantity: { type: Number, default: 1 },
 });
 
 const orderSchema = new Schema({
@@ -151,11 +127,11 @@ const orderSchema = new Schema({
   status: {
     type: String,
     required: true,
-    enum: ["Trial", "Finished", "Pending", "Completed", "Cancelled"],
+    enum: ["Pending", "Trial", "Finished", "Completed", "Cancelled"],
   },
   shop: { type: String, required: true },
-  bill: { type: String, default: "" },
-  measurements: { type: measurementSchema },
+  bill: { type: String },
+  measurements: { type: measurementsSchema },
   creator: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",

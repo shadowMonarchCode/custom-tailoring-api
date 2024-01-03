@@ -55,7 +55,7 @@ userRouter.put("/update/shop", verifyToken, isAdmin, updateUserShop);
 
 //* POST routes
 // Create user (Admin/Manager)
-userRouter.post("/createUser", verifyToken, isAdminOrManager, createUser);
+userRouter.post("/create", verifyToken, isAdminOrManager, createUser);
 
 // User login authentication
 userRouter.post("/login", authenticateUser);

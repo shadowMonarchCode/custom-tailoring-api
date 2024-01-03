@@ -2,6 +2,7 @@ import express, { Router } from "express";
 import {
   createOrder,
   deleteOrderById,
+  getAllMyOrders,
   getAllOrders,
   getOrderById,
   getOrdersByDateRange,
@@ -17,7 +18,13 @@ const orderRouter: Router = express.Router();
 //* GET Route
 orderRouter.get("/all", verifyToken, isAuthenticated, getAllOrders);
 orderRouter.get("/get/:orderId", verifyToken, isAuthenticated, getOrderById);
-orderRouter.get("/shop", verifyToken, isAuthenticated, getOrdersByShop);
+orderRouter.get(
+  "/shop/:shopNum",
+  verifyToken,
+  isAuthenticated,
+  getOrdersByShop
+);
+orderRouter.get("/my", verifyToken, isAuthenticated, getAllMyOrders);
 orderRouter.get(
   "/search/:searchTerm",
   verifyToken,
@@ -32,8 +39,13 @@ orderRouter.get(
 );
 
 //* PUT Route
-orderRouter.put("/update/:orderId",verifyToken, isAuthenticated, updateOrder);
-orderRouter.put("/update/status",verifyToken, isAuthenticated, updateOrderStatus);
+orderRouter.put("/update/:orderId", verifyToken, isAuthenticated, updateOrder);
+orderRouter.put(
+  "/update/status",
+  verifyToken,
+  isAuthenticated,
+  updateOrderStatus
+);
 
 //* POST Route
 orderRouter.post("/create", verifyToken, isAuthenticated, createOrder);
