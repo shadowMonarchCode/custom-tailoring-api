@@ -37,8 +37,8 @@ interface IMeasurements {
 
 interface Dates {
   order: Date;
-  trial: Date;
-  delivery: Date;
+  trial?: Date;
+  delivery?: Date;
   completion?: Date;
   cancelled?: Date;
 }
@@ -60,8 +60,8 @@ export interface IOrder extends Document {
 
 const datesSchema = new mongoose.Schema({
   order: { type: Date, required: true },
-  trial: { type: Date, required: true },
-  delivery: { type: Date, required: true },
+  trial: { type: Date, default: new Date() },
+  delivery: { type: Date, default: new Date() },
   completion: { type: Date },
   cancelled: { type: Date },
 });

@@ -1,3 +1,4 @@
+require("dotenv").config();
 import { Request, Response, NextFunction } from "express";
 import { JwtPayload } from "jsonwebtoken";
 import { AuthenticatedRequest } from "../types";
@@ -11,16 +12,16 @@ export const verifyToken = (
   const token = req.headers.authorization;
 
   if (!token) {
-    res.status(401).send("Unauthorized: Missing token");
+    res.status(401).json({ error: "Unauthorized: Missing token" });
     return;
   }
 
   jwt.verify(
     token,
-    "superhumanisthekeytoextinction",
+    process.env.JWT_TOKEN_KEY,
     (err: any, decoded: JwtPayload | undefined) => {
       if (err) {
-        return res.status(401).send("Unauthorized: Invalid token");
+        return res.status(401).json({ error: "Unauthorized: Invalid token" });
       }
 
       if (decoded) {
@@ -33,7 +34,7 @@ export const verifyToken = (
 
         next();
       } else {
-        res.status(401).send("Unauthorized: Invalid token payload");
+        res.status(401).json({ error: "Unauthorized: Invalid token payload" });
       }
     }
   );

@@ -1,5 +1,6 @@
 import express, { Router } from "express";
 import {
+  bulkCreateOrders,
   createOrder,
   deleteOrderById,
   getAllMyOrders,
@@ -41,7 +42,7 @@ orderRouter.get(
 //* PUT Route
 orderRouter.put("/update/:orderId", verifyToken, isAuthenticated, updateOrder);
 orderRouter.put(
-  "/update/status",
+  "/update-status/:orderId",
   verifyToken,
   isAuthenticated,
   updateOrderStatus
@@ -49,6 +50,7 @@ orderRouter.put(
 
 //* POST Route
 orderRouter.post("/create", verifyToken, isAuthenticated, createOrder);
+orderRouter.post("/bulk", verifyToken, isAuthenticated, bulkCreateOrders);
 
 //* DELETE Route
 orderRouter.delete(

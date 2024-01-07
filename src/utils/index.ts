@@ -24,7 +24,7 @@ export const authenticate = async (
     if (passwordMatch) {
       const token = jwt.sign(
         { userId: userId, role: role, shop: shop },
-        "superhumanisthekeytoextinction",
+        process.env.JWT_TOKEN_KEY,
         { expiresIn: "1d" }
       );
 

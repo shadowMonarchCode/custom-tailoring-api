@@ -3,7 +3,130 @@ import Order, { IOrder } from "../models/order.model";
 import Customer, { ICustomer } from "../models/customer.model";
 import User, { IUser } from "../models/user.model";
 import mongoose from "mongoose";
-import { AuthenticatedRequest, INewOrder } from "../types";
+import { AuthenticatedRequest } from "../types";
+
+// Create multiple orders
+export const bulkCreateOrders = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { userId, role, shops } = req.user!;
+    const ordersData = req.body.orders;
+
+    // Validate request body
+    if (!ordersData || !Array.isArray(ordersData) || ordersData.length === 0) {
+      res
+        .status(400)
+        .json({ error: "Invalid or missing orders in the request body" });
+      return;
+    }
+
+    const existingOrders = await Order.find({
+      $or: ordersData.map((order) => ({
+        order: order.order,
+        shop: order.shop,
+      })),
+    });
+
+    // Check if any of the orders already exist
+    if (existingOrders.length > 0) {
+      const duplicateOrders = existingOrders.map((order) => ({
+        order: order.order,
+        shop: order.shop,
+      }));
+      res
+        .status(403)
+        .json({ error: "Some orders already exist.", duplicateOrders });
+      return;
+    }
+
+    const createdOrders: IOrder[] = [];
+
+    for (const orderData of ordersData) {
+      const {
+        order,
+        dates,
+        name,
+        phone,
+        products,
+        status,
+        shop,
+        measurements,
+      } = orderData;
+
+      // Validate order data
+      if (!order || !dates || !products || !status || !shop) {
+        res
+          .status(400)
+          .json({ error: "Missing required fields in the order data" });
+        return;
+      }
+
+      // Check authorization
+      if (role !== "Admin" && !shops.includes(shop)) {
+        console.log(shops, shop);
+        res.status(401).json({
+          error: "Unauthorized: You cannot add orders for this shop.",
+        });
+        return;
+      }
+
+      // Check if the customer with the given phone number exists
+      let searchCustomer: ICustomer = await Customer.findOneAndUpdate(
+        { phone },
+        { name, phone },
+        { upsert: true, new: true }
+      );
+      const newDates = {
+        order: new Date(dates.order),
+        cancellation: new Date(dates?.cancellation),
+      };
+      // Create a new order using the customer ID
+      const newOrder = new Order({
+        order,
+        dates: newDates,
+        customer: searchCustomer._id,
+        products,
+        status,
+        shop,
+        measurements,
+        creator: userId,
+      });
+
+      // Save the new order
+      const savedOrder: IOrder = await newOrder.save();
+      createdOrders.push(savedOrder);
+
+      // Save order ID and update measurements in the user
+      searchCustomer.orders.push(savedOrder._id);
+      searchCustomer.measurements = measurements;
+      await searchCustomer.save();
+
+      // Save order ID in the user
+      let user: IUser | null = await User.findById(userId);
+      if (user) {
+        user.orders.push(savedOrder._id);
+        await user.save();
+      }
+    }
+
+    // Commit the transaction
+    await session.commitTransaction();
+
+    res.status(201).json(createdOrders);
+  } catch (error) {
+    // Abort the transaction if an error occurs
+    await session.abortTransaction();
+    console.error(error);
+    res.status(500).send("Internal Server Error");
+  } finally {
+    session.endSession();
+  }
+};
 
 // Get all orders
 export const getAllOrders = async (
@@ -144,7 +267,7 @@ export const getAllMyOrders = async (
         select: "name",
       },
     ]);
-    
+
     if (orders.length === 0) {
       res.status(404).json({ error: "No orders found for the specified shop" });
       return;
@@ -235,23 +358,22 @@ export const getOrdersByDateRange = async (
   res: Response
 ): Promise<void> => {
   try {
-    let { startDate, endDate } = req.body;
+    const dates = req.query;
     const { userId, role, shops } = req.user!;
+    const { start: startDate, end: endDate } = dates;
 
-    if (!startDate) {
+    if (!startDate || !endDate) {
       res.status(400).json({ error: "Missing starting date!" });
       return;
-    } else {
-      startDate = new Date(startDate);
-    }
-    if (!endDate) {
-      endDate = new Date();
     }
 
     let orders: IOrder[] | null;
     if (role === "Manager" || role === "User") {
       orders = await Order.find({
-        orderDate: { $gte: startDate, $lte: endDate },
+        "dates.order": {
+          $gte: new Date(startDate as string),
+          $lte: new Date(endDate as string),
+        },
         shop: { $in: shops },
       }).populate([
         {
@@ -279,7 +401,6 @@ export const getOrdersByDateRange = async (
     } else {
       orders = [];
     }
-
     res.status(200).json(orders);
   } catch (error) {
     console.error(error);
@@ -352,7 +473,6 @@ export const updateOrder = async (
   }
 };
 
-//TODO: Update status of order
 export const updateOrderStatus = async (
   req: AuthenticatedRequest,
   res: Response
@@ -360,54 +480,57 @@ export const updateOrderStatus = async (
   try {
     const { userId, role, shops } = req.user!;
     const orderId = req.params.orderId;
-    const newStatus = req.body.status;
-
-    // Validate request parameters
-    if (!orderId) {
-      res.status(400).json({ error: "Order ID parameter is required" });
-      return;
-    }
+    const { status, date, bill } = req.body.data;
 
     // Validate request body
-    if (!newStatus) {
-      res
-        .status(400)
-        .json({ error: "Status field is required in the request body" });
+    if (!status || !date || !orderId) {
+      res.status(400).json({ error: "Required parameters are missing." });
       return;
     }
 
     const order: IOrder | null = await Order.findById(orderId);
     if (!order) {
-      res.status(404).json({ error: "No order with the given order number." });
+      res.status(404).json({ error: "No order with the given order id." });
       return;
     }
-
-    if (role === "Manager" || role === "User") {
-      if (role === "User" && order.creator !== userId) {
-        res
-          .status(401)
-          .json({ error: "Unauthorised: You can not edit this order." });
-        return;
-      }
-
-      if (!shops.includes(order.shop)) {
-        res
-          .status(401)
-          .json({ error: "Unauthorised: You can not edit this order." });
-        return;
-      }
+    const parsedDate = new Date(date);
+    if (status === "Trial") {
+      order.dates.trial = parsedDate;
+    } else if (status === "Delivery") {
+      order.dates.delivery = parsedDate;
+    } else if (status === "Completed") {
+      order.dates.completion = parsedDate;
+    } else if (status === "Cancelled") {
+      order.dates.cancelled = parsedDate;
     }
+
+    // TODO: Add auth for user type
+    // if (role === "Manager" || role === "User") {
+    //   if (role === "User" && order.creator !== userId) {
+    //     res
+    //       .status(401)
+    //       .json({ error: "Unauthorised: You can not edit this order." });
+    //     return;
+    //   }
+
+    //   if (!shops.includes(order.shop)) {
+    //     res
+    //       .status(401)
+    //       .json({ error: "Unauthorised: You can not edit this order." });
+    //     return;
+    //   }
+    // }
 
     // Find and update order status by ID
     const updatedOrder: IOrder | null = await Order.findByIdAndUpdate(
       orderId,
-      { status: newStatus },
+      { status, bill, dates: order.dates },
       { new: true }
     ).populate({
       path: "customer",
       select: "name phone",
     });
-
+    console.log(updatedOrder);
     res.json(updatedOrder);
   } catch (error) {
     console.error(error);
@@ -435,68 +558,20 @@ export const createOrder = async (
       measurements,
       creator,
     } = req.body.order;
-    // console.log(req.body.order.dates);
+
     //TODO Validate request body
-    // if (
-    //   !order ||
-    //   !dates ||
-    //   !customer ||
-    //   !products ||
-    //   !status ||
-    //   !shop ||
-    //   !creator
-    // ) {
-    //   res
-    //     .status(400)
-    //     .json({ error: "Missing required fields in the request body" });
-    //   return;
-    // }
-    if (!order) {
+    if (
+      !order ||
+      !dates ||
+      !customer ||
+      !products ||
+      !status ||
+      !shop ||
+      !creator
+    ) {
       res
         .status(400)
-        .json({ error: "Missing 'order' field in the request body" });
-      return;
-    }
-
-    if (!dates) {
-      res
-        .status(400)
-        .json({ error: "Missing 'dates' field in the request body" });
-      return;
-    }
-
-    if (!customer) {
-      res
-        .status(400)
-        .json({ error: "Missing 'customer' field in the request body" });
-      return;
-    }
-
-    if (!products) {
-      res
-        .status(400)
-        .json({ error: "Missing 'products' field in the request body" });
-      return;
-    }
-
-    if (!status) {
-      res
-        .status(400)
-        .json({ error: "Missing 'status' field in the request body" });
-      return;
-    }
-
-    if (!shop) {
-      res
-        .status(400)
-        .json({ error: "Missing 'shop' field in the request body" });
-      return;
-    }
-
-    if (!creator) {
-      res
-        .status(400)
-        .json({ error: "Missing 'creator' field in the request body" });
+        .json({ error: "Missing required fields in the request body" });
       return;
     }
 
@@ -583,7 +658,7 @@ export const deleteOrderById = async (
       res.status(404).json({ error: "Order not found" });
       return;
     }
-    if (role === "Manager" && shops.includes(orderToDelete.shop)) {
+    if (role === "Manager" && !shops.includes(orderToDelete.shop)) {
       await session.abortTransaction();
       res.status(401).json({
         error: "Unauthorized: This order does not belong to you shop.",
