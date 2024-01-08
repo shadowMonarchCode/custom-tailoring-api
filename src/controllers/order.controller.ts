@@ -280,6 +280,76 @@ export const getAllMyOrders = async (
   }
 };
 
+// Get trial orderd by date
+export const getTrialOrdersByDate = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { userId, role, shops } = req.user!;
+    const date = req.params.date;
+    let orders: IOrder[] | null;
+    orders = await Order.find({
+      "dates.trial": {
+        $gte: new Date(date),
+        $lt: new Date(date + "T23:59:59.999Z"),
+      },
+      shop: { $in: shops },
+    }).populate([
+      {
+        path: "customer",
+        select: "name phone",
+      },
+      {
+        path: "creator",
+        select: "name",
+      },
+    ]);
+    if (orders === null) {
+      orders = [];
+    }
+    res.status(201).json(orders);
+  } catch (error) {
+    console.log(error);
+    res.status(500).send("Internal Server Error");
+  }
+};
+
+// Get trial orderd by date
+export const getDeliveryOrdersByDate = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { userId, role, shops } = req.user!;
+    const date = req.params.date;
+    let orders: IOrder[] | null;
+    orders = await Order.find({
+      "dates.delivery": {
+        $gte: new Date(date),
+        $lt: new Date(date + "T23:59:59.999Z"),
+      },
+      shop: { $in: shops },
+    }).populate([
+      {
+        path: "customer",
+        select: "name phone",
+      },
+      {
+        path: "creator",
+        select: "name",
+      },
+    ]);
+    if (orders === null) {
+      orders = [];
+    }
+    res.status(201).json(orders);
+  } catch (error) {
+    console.log(error);
+    res.status(500).send("Internal Server Error");
+  }
+};
+
 // Ultimate Search Algorithm
 export const ultimateSearch = async (
   req: AuthenticatedRequest,

@@ -8,6 +8,7 @@ import {
   getOrderById,
   getOrdersByDateRange,
   getOrdersByShop,
+  getTrialOrdersByDate,
   ultimateSearch,
   updateOrder,
   updateOrderStatus,
@@ -37,6 +38,18 @@ orderRouter.get(
   verifyToken,
   isAuthenticated,
   getOrdersByDateRange
+);
+orderRouter.get(
+  "/trials/:date",
+  verifyToken,
+  isAuthenticated,
+  getTrialOrdersByDate
+);
+orderRouter.get(
+  "/deliveries/:date",
+  verifyToken,
+  isAuthenticated,
+  getTrialOrdersByDate
 );
 
 //* PUT Route
