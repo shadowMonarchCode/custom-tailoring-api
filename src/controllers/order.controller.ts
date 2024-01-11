@@ -288,11 +288,15 @@ export const getTrialOrdersByDate = async (
   try {
     const { userId, role, shops } = req.user!;
     const date = req.params.date;
+    const gDate = new Date(`${date}T00:00:00.000+05:30`);
+    const lDate = new Date(gDate);
+    lDate.setDate(lDate.getDate() + 1);
+
     let orders: IOrder[] | null;
     orders = await Order.find({
       "dates.trial": {
-        $gte: new Date(date),
-        $lt: new Date(date + "T23:59:59.999Z"),
+        $gte: gDate,
+        $lt: lDate,
       },
       shop: { $in: shops },
     }).populate([
@@ -315,7 +319,7 @@ export const getTrialOrdersByDate = async (
   }
 };
 
-// Get trial orderd by date
+// Get deliveries orderd by date
 export const getDeliveryOrdersByDate = async (
   req: AuthenticatedRequest,
   res: Response
@@ -323,11 +327,15 @@ export const getDeliveryOrdersByDate = async (
   try {
     const { userId, role, shops } = req.user!;
     const date = req.params.date;
+    const gDate = new Date(`${date}T00:00:00.000+05:30`);
+    const lDate = new Date(gDate);
+    lDate.setDate(lDate.getDate() + 1);
+
     let orders: IOrder[] | null;
     orders = await Order.find({
       "dates.delivery": {
-        $gte: new Date(date),
-        $lt: new Date(date + "T23:59:59.999Z"),
+        $gte: gDate,
+        $lt: lDate,
       },
       shop: { $in: shops },
     }).populate([
@@ -437,12 +445,18 @@ export const getOrdersByDateRange = async (
       return;
     }
 
+    const start = new Date(`${startDate}T00:00:00.000+05:30`);
+    start.setDate(start.getDate() + 1);
+    const end = new Date(`${endDate}T00:00:00.000+05:30`);
+    end.setDate(end.getDate() + 2);
+    console.log(start, end);
+
     let orders: IOrder[] | null;
     if (role === "Manager" || role === "User") {
       orders = await Order.find({
         "dates.order": {
-          $gte: new Date(startDate as string),
-          $lte: new Date(endDate as string),
+          $gte: start,
+          $lt: end,
         },
         shop: { $in: shops },
       }).populate([

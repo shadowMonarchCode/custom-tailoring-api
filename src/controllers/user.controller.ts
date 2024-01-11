@@ -409,7 +409,6 @@ export const authenticateUser = async (
 ): Promise<void> => {
   try {
     const { username, password } = req.body;
-
     // Retrieve the user from the database based on the username
     const user: IUser | null = await User.findOne({ username });
     // If the user is not found, return null

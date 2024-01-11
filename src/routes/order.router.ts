@@ -5,6 +5,7 @@ import {
   deleteOrderById,
   getAllMyOrders,
   getAllOrders,
+  getDeliveryOrdersByDate,
   getOrderById,
   getOrdersByDateRange,
   getOrdersByShop,
@@ -49,7 +50,7 @@ orderRouter.get(
   "/deliveries/:date",
   verifyToken,
   isAuthenticated,
-  getTrialOrdersByDate
+  getDeliveryOrdersByDate
 );
 
 //* PUT Route
